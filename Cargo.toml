@@ -8,5 +8,7 @@ edition = "2021"
 [dependencies]
 socket2 = { version = "0.3.4", features = ["reuseport"] }
 lazy_static = { version = "1.4.0" }
-if-addrs2 = "0.10.2"
+if-addrs2 = { version = "0.10.2" }
 clap = { version = "4.4.3", features = ["derive"] }
+log = "0.4.20"
+env_logger = "0.10.0"

@@ -1,16 +1,16 @@
-use std::net::{Ipv4Addr, SocketAddr, IpAddr};
-use std::io::{Result};
-use std::io::{Error, ErrorKind::Other};
-use std::sync::mpsc::{Receiver, Sender};
-use std::{thread};
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::thread::JoinHandle;
+use crate::config;
 use if_addrs2::get_if_addrs;
-use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use lazy_static::lazy_static;
 use log::{error, info};
-use crate::config;
+use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+use std::io::Result;
+use std::io::{Error, ErrorKind::Other};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::sync::atomic::AtomicBool;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
+use std::thread;
+use std::thread::JoinHandle;
 
 lazy_static! {
     static ref MDNS_ADDR: SocketAddr = "224.0.0.251:5353".parse::<SocketAddr>().unwrap();
@@ -23,7 +23,7 @@ lazy_static! {
 fn bind_multicast(socket: &Socket, addr: SocketAddr) -> Result<()> {
     let addr = match addr {
         SocketAddr::V4(_addr) => addr,
-        SocketAddr::V6(_addr) => Err(Error::new(Other, "IPv6 is not supported"))?
+        SocketAddr::V6(_addr) => Err(Error::new(Other, "IPv6 is not supported"))?,
     };
     socket.bind(&socket2::SockAddr::from(addr))
 }
@@ -77,10 +77,13 @@ fn join_multicast(socket: &Socket, multiaddr: &Ipv4Addr) -> Result<()> {
 }
 
 // receive mdns message
-pub(crate) fn receiver(tx: Sender<(Box<[u8]>, SockAddr)>, server_done: Arc<AtomicBool>) -> Result<JoinHandle<()>> {
+pub(crate) fn receiver(
+    tx: Sender<(Box<[u8]>, SockAddr)>,
+    server_done: Arc<AtomicBool>,
+) -> Result<JoinHandle<()>> {
     let socket = new_socket()?;
     match *MDNS_ADDR {
-        SocketAddr::V4(addr) => join_multicast(&socket, &addr.ip())?,
+        SocketAddr::V4(addr) => join_multicast(&socket, addr.ip())?,
         _ => Err(Error::new(Other, "IPv6 is not supported"))?,
     };
     socket.set_reuse_address(true)?;
@@ -93,9 +96,8 @@ pub(crate) fn receiver(tx: Sender<(Box<[u8]>, SockAddr)>, server_done: Arc<Atomi
             match socket.recv_from(&mut buf) {
                 Ok((len, remote_addr)) => {
                     let data = buf[..len].to_vec().into_boxed_slice();
-                    tx.send((data, remote_addr)).unwrap_or_else(|err| {
-                        error!("send msg to chan failed: {err}")
-                    });
+                    tx.send((data, remote_addr))
+                        .unwrap_or_else(|err| error!("send msg to chan failed: {err}"));
                 }
                 Err(err) => {
                     error!("recv msg error: {err}");
@@ -110,10 +112,13 @@ pub(crate) fn receiver(tx: Sender<(Box<[u8]>, SockAddr)>, server_done: Arc<Atomi
 }
 
 // send mdns message to other interface
-pub(crate) fn announcer(rx: Receiver<(Box<[u8]>, SockAddr)>, server_done: Arc<AtomicBool>) -> Result<JoinHandle<()>> {
+pub(crate) fn announcer(
+    rx: Receiver<(Box<[u8]>, SockAddr)>,
+    server_done: Arc<AtomicBool>,
+) -> Result<JoinHandle<()>> {
     let socket = new_socket()?;
     match *MDNS_ADDR {
-        SocketAddr::V4(addr) => join_multicast(&socket, &addr.ip())?,
+        SocketAddr::V4(addr) => join_multicast(&socket, addr.ip())?,
         _ => Err(Error::new(Other, "IPv6 is not supported"))?,
     };
     socket.set_reuse_address(true)?;
@@ -157,17 +162,14 @@ pub(crate) fn announcer(rx: Receiver<(Box<[u8]>, SockAddr)>, server_done: Arc<At
                     IpAddr::V4(_addr) => {
                         socket.set_multicast_if_v4(_addr).unwrap();
                     }
-                    IpAddr::V6(_) => {
-                        error!("server error");
+                    IpAddr::V6(_addr) => {
+                        error!("ip v6 addr is found: {}", _addr);
                         break;
                     }
                 }
-                match socket.send_to(&*data, &SockAddr::from(*MDNS_ADDR)) {
-                    Err(_err) => {
-                        error!("server error {_err}");
-                        break;
-                    }
-                    _ => ()
+                if let Err(_err) = socket.send_to(&data, &SockAddr::from(*MDNS_ADDR)) {
+                    error!("server error {_err}");
+                    break;
                 };
             }
         }
@@ -175,4 +177,3 @@ pub(crate) fn announcer(rx: Receiver<(Box<[u8]>, SockAddr)>, server_done: Arc<At
     });
     Ok(handler)
 }
-

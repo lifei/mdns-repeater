@@ -57,6 +57,7 @@ fn get_address_list() -> Result<Vec<(String, IpAddr)>> {
         .iter()
         .filter(|iface| !iface.is_loopback())
         .filter(|iface| -> bool { config::ARGS.lock().unwrap().interface.contains(&iface.name) })
+        .filter(|iface| iface.ip().is_ipv4())
         .map(|iface| (iface.name.clone(), iface.ip()))
         .collect())
 }

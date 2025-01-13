@@ -133,7 +133,7 @@ pub(crate) fn announcer(rx: Receiver<(Box<[u8]>, SockAddr)>, server_done: Arc<At
             };
             info!(
                 "[server]: got data: {} from: {}",
-                String::from_utf8_lossy(&*data),
+                data.len(),
                 remote_addr.as_std().unwrap()
             );
             for (_, addr) in &*ADDR_LIST {

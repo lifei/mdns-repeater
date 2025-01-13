@@ -34,6 +34,7 @@ fn bind_multicast(socket: &Socket, addr: SocketAddr) -> Result<()> {
 /// On unixes we bind to the multicast address, which causes multicast packets to be filtered
 #[cfg(unix)]
 fn bind_multicast(socket: &Socket, addr: SocketAddr) -> Result<()> {
+    let _ = socket.set_reuse_port(true);
     socket.bind(&socket2::SockAddr::from(addr))
 }
 

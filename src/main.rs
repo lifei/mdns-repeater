@@ -32,6 +32,12 @@ fn main() -> Result<()> {
         "The following mdns information for the network card is repeated:\n{}",
         list
     );
+
+    if server::ADDR_LIST.len() == 1 {
+        error!("Only one ip addr found!");
+        exit(1);
+    }
+
     let server_done = Arc::new(AtomicBool::new(false));
 
     let mut threads = Vec::new();
@@ -53,4 +59,3 @@ fn main() -> Result<()> {
     }
     Ok(())
 }
-

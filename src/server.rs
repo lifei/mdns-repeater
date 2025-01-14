@@ -96,8 +96,13 @@ pub(crate) fn receiver(
             match socket.recv_from(&mut buf) {
                 Ok((len, remote_addr)) => {
                     let data = buf[..len].to_vec().into_boxed_slice();
-                    tx.send((data, remote_addr))
-                        .unwrap_or_else(|err| error!("send msg to chan failed: {err}"));
+                    if let Err(err) = tx.send((data, remote_addr)) {
+                        error!("send msg to chan failed: {err}");
+                        if err.to_string().contains("closed") {
+                            server_done.store(true, std::sync::atomic::Ordering::Relaxed);
+                            return;
+                        }
+                    }
                 }
                 Err(err) => {
                     error!("recv msg error: {err}");
@@ -166,7 +171,10 @@ pub(crate) fn announcer(
                 }
                 match if_addrs {
                     IpAddr::V4(_addr) => {
-                        socket.set_multicast_if_v4(_addr).unwrap();
+                        if let Err(err) = socket.set_multicast_if_v4(_addr) {
+                            error!("socket set_multicast_if_v4 err: {}", err);
+                            break;
+                        }
                     }
                     IpAddr::V6(_addr) => {
                         error!("ip v6 addr is found: {}", _addr);

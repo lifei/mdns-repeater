@@ -136,6 +136,12 @@ pub(crate) fn announcer(
                     break;
                 }
             };
+            if !data
+                .windows(8)
+                .any(|window| window == [98, 108, 105, 122, 122, 97, 114, 100])
+            {
+                continue;
+            }
             info!(
                 "[server]: got data: {} from: {}",
                 data.len(),
